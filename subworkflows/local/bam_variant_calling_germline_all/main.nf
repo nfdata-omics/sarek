@@ -6,6 +6,7 @@ include { BAM_JOINT_CALLING_GERMLINE_GATK                                       
 include { BAM_JOINT_CALLING_GERMLINE_SENTIEON                                          } from '../bam_joint_calling_germline_sentieon/main'
 include { BAM_VARIANT_CALLING_CNVKIT                                                   } from '../bam_variant_calling_cnvkit/main'
 include { BAM_VARIANT_CALLING_DEEPVARIANT                                              } from '../bam_variant_calling_deepvariant/main'
+include { BAM_VARIANT_CALLING_PARABRICKS                                               } from '../bam_variant_calling_parabricks/main'
 include { BAM_VARIANT_CALLING_FREEBAYES                                                } from '../bam_variant_calling_freebayes/main'
 include { BAM_VARIANT_CALLING_GERMLINE_MANTA                                           } from '../bam_variant_calling_germline_manta/main'
 include { BAM_VARIANT_CALLING_HAPLOTYPECALLER                                          } from '../bam_variant_calling_haplotypecaller/main'
@@ -23,7 +24,7 @@ workflow BAM_VARIANT_CALLING_GERMLINE_ALL {
     take:
     tools                             // Mandatory, list of tools to apply
     skip_tools                        // Mandatory, list of tools to skip
-    cram                              // channel: [mandatory] meta, cram
+    cram                              // channel: [mandatory] meta, cram, crai
     bwa                               // channel: [mandatory] meta, bwa
     cnvkit_reference                  // channel: [optional] cnvkit reference
     dbsnp                             // channel: [mandatory] meta, dbsnp
@@ -95,16 +96,31 @@ workflow BAM_VARIANT_CALLING_GERMLINE_ALL {
 
     // DEEPVARIANT
     if (tools.split(',').contains('deepvariant')) {
-        BAM_VARIANT_CALLING_DEEPVARIANT(
-            cram,
-            dict,
-            fasta,
-            fasta_fai,
-            intervals
-        )
 
-        vcf_deepvariant = BAM_VARIANT_CALLING_DEEPVARIANT.out.vcf
-        versions = versions.mix(BAM_VARIANT_CALLING_DEEPVARIANT.out.versions)
+        if (params.use_parabricks) {
+            BAM_VARIANT_CALLING_PARABRICKS(
+                cram.combine(intervals).map{ meta, cram, crai, intervals, num_intervals -> 
+                    [ meta + [num_intervals: num_intervals], cram, crai, intervals ] 
+                },
+                fasta,
+                dict
+            )
+
+            vcf_deepvariant = BAM_VARIANT_CALLING_PARABRICKS.out.vcf
+            versions = versions.mix(BAM_VARIANT_CALLING_PARABRICKS.out.versions)
+
+        } else {
+            BAM_VARIANT_CALLING_DEEPVARIANT(
+                cram,
+                dict,
+                fasta,
+                fasta_fai,
+                intervals
+            )
+
+            vcf_deepvariant = BAM_VARIANT_CALLING_DEEPVARIANT.out.vcf
+            versions = versions.mix(BAM_VARIANT_CALLING_DEEPVARIANT.out.versions)
+        }
     }
 
     // FREEBAYES
