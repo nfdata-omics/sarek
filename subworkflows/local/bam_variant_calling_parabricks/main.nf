@@ -15,6 +15,8 @@ workflow BAM_VARIANT_CALLING_PARABRICKS {
     main:
     versions = Channel.empty()
 
+    cram_intervals.view()
+
     // Run the Parabricks DeepVariant process
     PARABRICKS_DEEPVARIANT(cram_intervals, fasta)
 

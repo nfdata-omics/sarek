@@ -3,6 +3,7 @@ process PARABRICKS_DEEPVARIANT {
     label 'process_high'
     label 'process_gpu'
     stageInMode 'copy' // needed by the module to work properly can be removed when fixed upstream - Issue #7226
+    maxForks 5
 
     container "nvcr.io/nvidia/clara/clara-parabricks:4.4.0-1"
 
@@ -24,19 +25,24 @@ process PARABRICKS_DEEPVARIANT {
         exit 1, "Parabricks module does not support Conda. Please use Docker / Singularity / Podman instead."
     }
     def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
-    def output_file = ("--gvcf" =~ task.ext.args)? "${prefix}.g.vcf.gz" : "${prefix}.vcf"
+    def interval_label = interval_file ? interval_file.baseName.replaceAll('[^a-zA-Z0-9_]', '_') : 'full'
+    def prefix = task.ext.prefix ?: "${meta.id}.deepvariant.${interval_label}"
+    //def output_file = ("--gvcf" =~ task.ext.args)? "${prefix}.g.vcf.gz" : "${prefix}.vcf"
     def interval_file_command = interval_file ? interval_file.collect{"--interval-file $it"}.join(' ') : ""
     def num_gpus = task.accelerator ? "--num-gpus $task.accelerator.request" : ''
     """
+    echo "meta.id = ${meta.id}" >> debug_meta.txt
+    echo "meta.interval = ${meta.interval}" >> debug_meta.txt
+
     pbrun \\
         deepvariant \\
         --ref $fasta \\
         --in-bam $input \\
-        --out-variants $output_file \\
+        --out-variants ${prefix}.vcf.gz \\
         $interval_file_command \\
         $num_gpus \\
         $args
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
