@@ -17,18 +17,18 @@ process PARABRICKS_DEEPVARIANT {
     path "versions.yml",                                 emit: versions
 
     when:
-    task.ext.when == null || task.ext.when
+    task.ext?.when == null || task.ext?.when
 
     script:
     // Exit if running this module with -profile conda / -profile mamba
     if (workflow.profile.tokenize(',').intersect(['conda', 'mamba']).size() >= 1) {
         exit 1, "Parabricks module does not support Conda. Please use Docker / Singularity / Podman instead."
     }
-    def args = task.ext.args ?: ''
+    def args = task.ext?.args ?: ''
     def interval_label = interval_file ? interval_file.baseName.replaceAll('[^a-zA-Z0-9_]', '_') : 'full'
-    def prefix = task.ext.prefix ?: "${meta.id}.deepvariant.${interval_label}"
-    //def output_file = ("--gvcf" =~ task.ext.args)? "${prefix}.g.vcf.gz" : "${prefix}.vcf"
+    def prefix = task.ext?.prefix ?: "${meta.id}.deepvariant.${interval_label}"
     def interval_file_command = interval_file ? interval_file.collect{"--interval-file $it"}.join(' ') : ""
+    def output_file = ("--gvcf" =~ task.ext.args)? "${prefix}.g.vcf.gz" : "${prefix}.vcf"
     def num_gpus = task.accelerator ? "--num-gpus $task.accelerator.request" : ''
     """
     echo "meta.id = ${meta.id}" >> debug_meta.txt
@@ -38,7 +38,7 @@ process PARABRICKS_DEEPVARIANT {
         deepvariant \\
         --ref $fasta \\
         --in-bam $input \\
-        --out-variants ${prefix}.vcf.gz \\
+        --out-variants $output_file \\
         $interval_file_command \\
         $num_gpus \\
         $args
@@ -51,8 +51,8 @@ process PARABRICKS_DEEPVARIANT {
     """
 
     stub:
-    def prefix = task.ext.prefix ?: "${meta.id}"
-    def output_cmd = ("--gvcf" =~ task.ext.args)? "echo '' | gzip > ${prefix}.g.vcf.gz" : "touch ${prefix}.vcf"
+    def prefix = task.ext?.prefix ?: "${meta.id}"
+    def output_cmd = ("--gvcf" =~ task.ext?.args)? "echo '' | gzip > ${prefix}.g.vcf.gz" : "touch ${prefix}.vcf"
     """
     $output_cmd
 
